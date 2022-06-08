@@ -30,19 +30,6 @@ func main() {
 		return
 	}
 
-	fmt.Println("")
-	// err = models.CreateTables()
-	// if err != nil {
-	// 	util.Log.Errorf("database create tables failed , err:%v\n", err)
-	// 	return
-	// }
-	//init redis
-	err = util.InitRedis()
-	if err != nil {
-		util.Log.Errorf("Redis connect failed , err:%v\n", err)
-		return
-	}
-
 	//init Authing.cn config
 	models.InitAuthing("", "")
 	//init kubernetes client-go

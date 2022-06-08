@@ -44,8 +44,8 @@ func InitDB() (err error) {
 	return nil
 }
 
-// CreateTables
-func CreateTables() (err error) {
+// SyncTablesStruct
+func SyncTablesStruct() (err error) {
 	// o := GetDB()
 	// var tx *gorm.DB
 	// if !o.Migrator().HasTable(&JobLog{}) {
@@ -55,5 +55,10 @@ func CreateTables() (err error) {
 	// 	}
 	// }
 
+	// err = db.AutoMigrate(models.Image{})
+	// if err != nil {
+	// 	logger.Error("failed to auto migrate image model")
+	// 	return nil, err
+	// }
 	return
 }
