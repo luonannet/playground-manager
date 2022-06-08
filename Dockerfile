@@ -1,19 +1,25 @@
-FROM golang:latest as BUILDER
-LABEL maintainer="zhangjianjun"
-# build binary
-RUN mkdir -p /go/src/gitee.com/openeuler/playground-manager
-COPY . /go/src/gitee.com/openeuler/playground-manager
-RUN cd /go/src/gitee.com/openeuler/playground-manager && go mod tidy && CGO_ENABLED=1 go build -v -o ./playground-manager main.go
+FROM golang:alpine3.13 as builder
+LABEL maintainer="luonancom<luonancom@qq.com>"
+WORKDIR /app
+COPY . /app
+RUN go mod download
+RUN CGO_ENABLED=0 go build -o omni-manager
+FROM alpine/git:v2.30.2
+ARG user=root 
+ARG group=root 
+ARG home=/app
+# to fix mv unrecoginzed option T
+RUN apk update --no-cache && apk add --no-cache coreutils=8.32-r2  
 
-# copy binary config and utils
-FROM openeuler/openeuler:21.03
-RUN mkdir -p /opt/app/conf/
-COPY ./conf/product_app.conf /opt/app/conf/app.conf
-# overwrite config yaml
-COPY --from=BUILDER /go/src/gitee.com/openeuler/playground-manager/playground-manager /opt/app
-WORKDIR /opt/app/
-ENTRYPOINT ["/opt/app/playground-manager"]
+USER ${user}
+WORKDIR ${home}
+RUN mkdir -p ${home}/logs  $$ -p ${home}/conf  
+COPY --chown=${user} --from=builder /app/omni-manager .
+COPY --chown=${user} ./conf ./conf/
+#to fix the directory permission issue
+VOLUME ["${home}/logs","${home}/conf"]
 
+ENV PATH="${home}:${PATH}" 
 
-
-
+EXPOSE 8080 8888
+ENTRYPOINT ["/app/omni-manager"]

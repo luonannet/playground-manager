@@ -1,27 +1,39 @@
 package routers
 
 import (
-	"playground_backend/controllers"
+	"github.com/omnibuildplatform/omni-manager/controllers"
+	"github.com/omnibuildplatform/omni-manager/docs"
+	"github.com/omnibuildplatform/omni-manager/models"
+	"github.com/omnibuildplatform/omni-manager/util"
 
-	"github.com/astaxie/beego"
+	swaggerfiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
+
+	"github.com/gin-gonic/gin"
 )
 
-func init() {
-	// Get callback request link
-	beego.Router("/playground/oauth2/callback/links", &controllers.Oauth2CallBackLinksControllers{})
-	// authing callback request link,Get callback result
-	beego.Router("/playground/oauth2/callback", &controllers.Oauth2CallBackControllers{})
-	// User authorization and authentication, obtain user information
-	beego.Router("/playground/oauth2/authentication", &controllers.Oauth2AuthenticationControllers{})
-	// Get user information after successful login(Obtain user information after authorization)
-	beego.Router("/playground/user/information", &controllers.UserInfoControllers{})
-	// The user creates crd resources and returns the result of creating resources
-	beego.Router("/playground/crd/resource", &controllers.CrdResourceControllers{})
-	// Bind the course/chapter selected by the user
-	beego.Router("/playground/users/course/chapter", &controllers.CourseChapterControllers{})
-	//
-	beego.Router("/playground/users/checkSubdomain", &controllers.CrdResourceControllers{}, "post:CheckSubdomain")
-	// Health check interface
-	beego.Router("/healthz/readiness", &controllers.HealthzReadController{})
-	beego.Router("/healthz/liveness", &controllers.HealthzLiveController{})
+//InitRouter init router
+func InitRouter() *gin.Engine {
+	r := gin.New()
+	r.Use(gin.Recovery())
+	r.Use(util.LoggerToFile())
+	docs.SwaggerInfo.BasePath = "/api"
+	docs.SwaggerInfo.Title = util.GetConfig().AppName
+	docs.SwaggerInfo.Description = "set token name: 'Authorization' at header "
+	auth := r.Group(docs.SwaggerInfo.BasePath)
+	{
+		auth.GET("/v1/auth/loginok", controllers.AuthingLoginOk)
+		auth.GET("/v1/auth/getDetail/:authingUserId", controllers.AuthingGetUserDetail)
+		auth.Use(models.Authorize()) //
+		auth.POST("/v1/auth/createUser", controllers.AuthingCreateUser)
+	}
+	//version 1 . call k8s api
+	v1 := r.Group(docs.SwaggerInfo.BasePath + "/v1")
+	{
+		v1.Use(models.Authorize()) //
+
+	}
+
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
+	return r
 }

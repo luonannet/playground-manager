@@ -1,17 +1,13 @@
-package common
+package util
 
 import (
-	"encoding/base64"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"os"
-	"strings"
 	"time"
 	"unicode"
 
-	"github.com/astaxie/beego"
-	"github.com/astaxie/beego/logs"
 	"k8s.io/client-go/rest"
 )
 
@@ -19,11 +15,9 @@ var GlobK8sConfig *rest.Config
 
 func Catchs() {
 	if err := recover(); err != nil {
-		logs.Error("The program is abnormal, err: ", err)
+		Log.Error("The program is abnormal, err: ", err)
 	}
 }
-
-var Pool = NUmStr + CharStr + SpecStr
 
 const DATE_FORMAT = "2006-01-02 15:04:05"
 const DATE_T_FORMAT = "2006-01-02T15:04:05"
@@ -31,14 +25,14 @@ const DATE_T_Z_FORMAT = "2006-01-02T15:04:05Z"
 const DT_FORMAT = "2006-01-02"
 
 func GetCurDate() string {
-	return time.Now().Format(DT_FORMAT)
+	return time.Now().In(CnTime).Format(DT_FORMAT)
 }
 
 func GetCurTime() string {
-	return time.Now().Format(DATE_T_Z_FORMAT)
+	return time.Now().In(CnTime).Format(DATE_FORMAT)
 }
 
-func CreateDir(dir string) error {
+func createDir(dir string) error {
 	_, err := os.Stat(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -73,7 +67,7 @@ func TimeConverStr(ts, oldLayout, newLayout string) string {
 	if err == nil {
 		unixTime = theTime.Unix() + 8*3600
 	} else {
-		logs.Error(err)
+		Log.Error(err)
 		return ""
 	}
 	timx := time.Unix(unixTime, 0).Format(newLayout)
@@ -104,73 +98,31 @@ func TimeStrToInt(ts, layout string) int64 {
 		unixTime := theTime.Unix()
 		return unixTime
 	} else {
-		logs.Error(err)
+		Log.Error(err)
 	}
 	return 0
 }
 
 // Time string to timestamp
 func PraseTimeInt(stringTime string) int64 {
-	if strings.Contains(stringTime, "T") {
-		return TimeStrToInt(stringTime, DATE_T_FORMAT)
-	}
 	return TimeStrToInt(stringTime, DATE_FORMAT)
 }
 
 func PraseTimeTint(tsStr string) int64 {
-	if strings.Contains(tsStr, "T") {
-		return TimeStrToInt(tsStr, DATE_T_FORMAT)
-	}
-	return TimeStrToInt(tsStr, DATE_FORMAT)
+	return TimeStrToInt(tsStr, DATE_T_FORMAT)
 }
 
-func LocalTimeToUTC(strTime string) (local time.Time) {
-	if strings.Contains(strTime, "T") {
-		local, _ = time.ParseInLocation(DATE_T_FORMAT, strTime, time.Local)
-	} else {
-		local, _ = time.ParseInLocation(DATE_FORMAT, strTime, time.Local)
-	}
+func LocalTimeToUTC(strTime string) time.Time {
+	local, _ := time.ParseInLocation(DATE_FORMAT, strTime, time.Local)
 	return local
 }
 
 func GetTZHTime(hours time.Duration) string {
-	now := time.Now()
+	now := time.Now().In(CnTime)
 	h, _ := time.ParseDuration("-1h")
 	dateTime := now.Add(hours * h).Format(DATE_T_Z_FORMAT)
 	fmt.Println("dateTime: ", dateTime)
 	return dateTime
-}
-
-func AesString(content []byte) (strs string) {
-	defer Catchs()
-	key := []byte(beego.AppConfig.String("key"))
-	strs, err := EnPwdCode(content, key)
-	if err != nil {
-		logs.Error(err)
-	} else {
-		logs.Info(strs)
-	}
-	return strs
-}
-
-func DesString(content string) (strContent []byte) {
-	defer Catchs()
-	key := []byte(beego.AppConfig.String("key"))
-	strContent, err := DePwdCode(content, key)
-	if err != nil {
-		logs.Error(err)
-	}
-	//logs.Info(string(strContent))
-	return strContent
-}
-
-func RandomString(lens int) string {
-	rand.Seed(time.Now().UnixNano())
-	bytes := make([]byte, lens)
-	for i := 0; i < lens; i++ {
-		bytes[i] = Pool[rand.Intn(len(Pool))]
-	}
-	return string(bytes)
 }
 
 func DelFile(fileList []string) {
@@ -179,7 +131,7 @@ func DelFile(fileList []string) {
 			if FileExists(filex) {
 				err := os.Remove(filex)
 				if err != nil {
-					logs.Error(err)
+					Log.Error(err)
 				}
 			}
 		}
@@ -199,7 +151,7 @@ func GetRandomString(l int) string {
 	str := "abcdefghijklmnopqrstuvwxyz"
 	bytes := []byte(str)
 	result := []byte{}
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	r := rand.New(rand.NewSource(time.Now().Local().UnixNano()))
 	for i := 0; i < l; i++ {
 		result = append(result, bytes[r.Intn(len(bytes))])
 	}
@@ -208,15 +160,4 @@ func GetRandomString(l int) string {
 
 func IsLetter(chars rune) bool {
 	return unicode.IsLetter(chars)
-}
-
-func ReadFileToEntry() {
-	content, fErr := ReadAll("template/kubeconfig.json")
-	if fErr != nil {
-		logs.Error("fErr: ", fErr)
-		return
-	}
-	aesStr := AesString(content)
-	encodeRes := base64.StdEncoding.EncodeToString([]byte(aesStr))
-	logs.Info("encodeRes: ", encodeRes)
 }

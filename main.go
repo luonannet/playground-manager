@@ -1,48 +1,60 @@
 package main
 
 import (
-	"playground_backend/common"
-	"playground_backend/controllers"
-	"playground_backend/handler"
-	"playground_backend/models"
-	_ "playground_backend/routers"
-	"playground_backend/task"
+	"fmt"
 
-	"github.com/astaxie/beego"
+	"github.com/gin-gonic/gin"
+	"github.com/luonannet/playground-backend/models"
+	"github.com/luonannet/playground-backend/routers"
+	"github.com/luonannet/playground-backend/util"
+	"github.com/sirupsen/logrus"
 )
 
 func init() {
-	// Initialization log
-	common.LogInit()
+
+	util.InitConfig("")
 }
-
 func main() {
-
-	// token, _ := common.GenToken("22", "abc")
-	// fmt.Println("-------------:", token)
-	//   models.MakeResourceContent()
-	// return
-	// init db
-	dbOk := models.Initdb()
-	if !dbOk {
-		println("error: Database initialization failed")
-		return
+	if util.GetConfig().AppModel == "dev" || util.GetConfig().AppModel == "debug" {
+		util.Log.SetLevel(logrus.DebugLevel)
+		util.GetConfig().AppModel = gin.DebugMode
+	} else {
+		util.Log.SetLevel(logrus.InfoLevel)
+		util.GetConfig().AppModel = gin.ReleaseMode
 	}
-	// 1. Initialize memory resources
-	handler.NewCoursePool(0)
-	handler.InitialResourcePool()
-	// Initialize a scheduled task
 
-	taskOk := task.InitTask()
-	if !taskOk {
-		println("error: Timing task initialization failed, the program ends")
-		task.StopTask()
+	//init database
+	err := util.InitDB()
+	if err != nil {
+		util.Log.Errorf("database connect failed , err:%v\n", err)
 		return
 	}
 
-	// single run
-	task.StartTask()
-	defer task.StopTask()
-	beego.ErrorController(&controllers.ErrorController{})
-	beego.Run()
+	fmt.Println("")
+	// err = models.CreateTables()
+	// if err != nil {
+	// 	util.Log.Errorf("database create tables failed , err:%v\n", err)
+	// 	return
+	// }
+	//init redis
+	err = util.InitRedis()
+	if err != nil {
+		util.Log.Errorf("Redis connect failed , err:%v\n", err)
+		return
+	}
+
+	//init Authing.cn config
+	models.InitAuthing("", "")
+	//init kubernetes client-go
+	// models.InitK8sClient()
+	util.InitStatisticsLog()
+	//startup a webscoket server to wait client ws
+	// go models.StartWebSocket()
+	gin.SetMode(util.GetConfig().AppModel)
+	r := routers.InitRouter()
+	address := fmt.Sprintf(":%d", util.GetConfig().AppPort)
+	util.Log.Infof(" startup meta http service at port %s .and %s mode \n", address, util.GetConfig().AppModel)
+	if err := r.Run(address); err != nil {
+		util.Log.Infof("startup meta  http service failed, err:%v\n", err)
+	}
 }
