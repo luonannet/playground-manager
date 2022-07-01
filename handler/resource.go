@@ -132,18 +132,12 @@ type CourseResources struct {
 }
 
 func PrintJsonStr(obj *unstructured.Unstructured) {
-	logs.Info("-------------------------obj:--------------------------\n", obj)
-	// encode back to JSON
-	fmt.Println(".........................print unstructured.Unstructured.....................")
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "    ")
 	enc.Encode(obj)
 }
 
 func PrintJsonList(obj *unstructured.UnstructuredList) {
-	logs.Info("--------------------------obj:--------------------------\n", obj)
-	// encode back to JSON
-	fmt.Println("........................print unstructured.UnstructuredList.....................")
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "    ")
 	enc.Encode(obj)
@@ -180,7 +174,7 @@ func GetResConfig(resourceId string) (resConfig *rest.Config, err error) {
 	}
 	resConfig, err = clientcmd.BuildConfigFromFlags("", filePath)
 	if err != nil {
-		logs.Error("BuildConfigFromFlags, err: ", err)
+		logs.Error("BuildConfigFromFlags, err: ", err.Error())
 		return
 	}
 	return
@@ -291,8 +285,6 @@ func InitReqTmplPrarse(rtp *ReqTmplParase, rr ReqResource, cr *CourseResources, 
 	subDomain := itr.Subdomain
 	namePassword := itr.NamePassword
 
-	fmt.Println(itr.Name, "===========================InitReqTmplPrarse====== NamePassword:", itr.NamePassword)
-
 	nameList := strings.Split(namePassword, ":")
 	if len(nameList) < 2 {
 		nameList = make([]string, 2)
@@ -335,6 +327,10 @@ func ParseTmpl(yamlDir string, rr ReqResource, localPath string, itr *InitTmplRe
 	if len(rr.ContactEmail) < 1 {
 		rr.ContactEmail = beego.AppConfig.DefaultString("template::contact_email", "contact@openeuler.sh")
 	}
+	if os.Getenv("CONTACT_EMAIL") != "" {
+		rr.ContactEmail = os.Getenv("CONTACT_EMAIL")
+	}
+
 	rtp := ReqTmplParase{ContactEmail: rr.ContactEmail}
 	if queryFlag {
 		QueryTmpData(&rtp, rr, cr, itr)
@@ -424,7 +420,6 @@ func AddAnnotations(yamlData []byte, cr *CourseResources) []byte {
 	decErr := ymV2.Unmarshal(yamlData, &yamlValue)
 	if decErr != nil {
 		logs.Error("decErr: ", decErr)
-		logs.Error("--------yaml:", string(yamlData))
 		return yamlData
 	}
 	logs.Info("yamlValue: ", yamlValue)
@@ -469,7 +464,7 @@ func DownLoadTemplate(yamlDir, fPath string) (error, string) {
 	logs.Info("DownLoadTemplate, gitUrl: ", gitUrl)
 	resp, err := http.Get(gitUrl)
 	if err != nil {
-		logs.Error("DownLoadTemplate, error: ", err)
+		logs.Error("DownLoadTemplate, error: ", err.Error())
 		return err, localPath
 	}
 	defer resp.Body.Close()
@@ -501,7 +496,7 @@ func UnstructuredYaml(yamlData []byte) {
 	dec := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
 	_, gvk, err := dec.Decode(yamlData, nil, obj)
 	if err != nil {
-		logs.Error("dec.Decode, err: ", err)
+		logs.Error("dec.Decode, err: ", err.Error())
 	}
 	// Get the common metadata, and show GVK
 	logs.Info(obj.GetName(), gvk.String())
@@ -510,23 +505,23 @@ func UnstructuredYaml(yamlData []byte) {
 func GetGVRdyClient(gvk *schema.GroupVersionKind, nameSpace, resourceId string) (dr dynamic.ResourceInterface, err error) {
 	config, err := GetResConfig(resourceId)
 	if err != nil {
-		logs.Error("GetResConfig, err: ", err)
+		logs.Error("GetResConfig, err: ", err.Error())
 		return
 	}
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
 	if err != nil {
-		logs.Error("NewDiscoveryClientForConfig, err: ", err)
+		logs.Error("NewDiscoveryClientForConfig, err: ", err.Error())
 		return
 	}
 	mapperGVRGVK := restmapper.NewDeferredDiscoveryRESTMapper(memory.NewMemCacheClient(discoveryClient))
 	resourceMapper, err := mapperGVRGVK.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
-		logs.Error("RESTMapping, err: ", err)
+		logs.Error("RESTMapping, err: ", err.Error())
 		return
 	}
 	dynamicClient, err := dynamic.NewForConfig(config)
 	if err != nil {
-		logs.Error("dynamic.NewForConfig, err: ", err)
+		logs.Error("dynamic.NewForConfig, err: ", err.Error())
 		return
 	}
 	if resourceMapper.Scope.Name() == meta.RESTScopeNameNamespace {
@@ -565,21 +560,17 @@ func RecIter(rls *ResListStatus, objGetData *unstructured.Unstructured,
 	obj *unstructured.Unstructured, updateFlag bool, itr *InitTmplResource) {
 	metadata, ok := ParsingMap(objGetData.Object, "metadata")
 	if !ok {
-		logs.Error("1 ----------------RecIter metadata does not exist error: ", metadata)
-		// ServerErroredFlag = true
 		rls.ServerErroredFlag = true
 		return
 	}
 	name, ok := ParsingMapStr(metadata, "name")
 	if !ok {
-		logs.Error("2 ----------------RecIter name does not exist error: ", name)
-		// ServerErroredFlag = true
+
 		rls.ServerErroredFlag = true
 		return
 	}
 	if name != obj.GetName() {
-		logs.Error("3 ----------------RecIter obj.GetName does not exist: ", obj.GetName())
-		// ServerErroredFlag = true
+
 		rls.ServerErroredFlag = true
 		return
 	}
@@ -587,8 +578,7 @@ func RecIter(rls *ResListStatus, objGetData *unstructured.Unstructured,
 		crs := CourseRes{}
 		isSet := AddTmplResourceList(*objGetData, crs, itr)
 		if !isSet {
-			logs.Error("4 ----------------RecIter AddTmplResourceList error: ", objGetData)
-			// ServerErroredFlag = true
+
 			rls.ServerErroredFlag = true
 		}
 	}
@@ -599,8 +589,7 @@ func RecIter(rls *ResListStatus, objGetData *unstructured.Unstructured,
 	}
 	conditions, ok := ParsingMapSlice(status, "conditions")
 	if !ok {
-		logs.Error("5 -----------------RecIter conditions does not exist: ", conditions)
-		// ServerErroredFlag = true
+
 		return
 	}
 	for _, cond := range conditions {
@@ -664,8 +653,6 @@ func RecIter(rls *ResListStatus, objGetData *unstructured.Unstructured,
 		case "ServerErrored":
 			status, ok := ParsingMapStr(conds, "status")
 			if ok && status == "True" {
-				// logs.Error("6 -----------------RecIter status ServerErrored: ", status)
-				// ServerErroredFlag = true
 				rls.ServerErroredFlag = true
 			}
 			message, ok := ParsingMap(conds, "message")
@@ -694,7 +681,7 @@ func UpdateObjData(dr dynamic.ResourceInterface, cr *CourseResources, objGetData
 	err := error(nil)
 	objGetData, err = dr.Get(context.TODO(), objGetData.GetName(), metav1.GetOptions{})
 	if err != nil {
-		logs.Error("7 -----------------UpdateObjData GetOptions error: ", err)
+
 		return objGetData
 	}
 	metadata, ok := ParsingMap(objGetData.Object, "metadata")
@@ -809,13 +796,24 @@ func UpdateObjData(dr dynamic.ResourceInterface, cr *CourseResources, objGetData
 func GetResInfo(objGetData *unstructured.Unstructured, dr dynamic.ResourceInterface,
 	config *YamlConfig, obj *unstructured.Unstructured, updateFlag bool, itr *InitTmplResource) ResListStatus {
 	err := error(nil)
+
+	var tryNum int
+tryNext:
 	rls := ResListStatus{ServerCreatedFlag: false, ServerReadyFlag: false,
 		ServerInactiveFlag: false, ServerRecycledFlag: false, ServerErroredFlag: false}
 	objGetData, err = dr.Get(context.TODO(), objGetData.GetName(), metav1.GetOptions{})
 	if err != nil {
-		logs.Error("-----------------get resource GetResInfo error: ", objGetData)
-		ServerErroredFlag = true
 		rls.ServerErroredFlag = true
+		tryNum++
+		if tryNum >= 10 {
+			err = dr.Delete(context.TODO(), objGetData.GetName(), metav1.DeleteOptions{})
+			if err != nil {
+				logs.Error("-----------------Delete resource GetResInfo error: ", err.Error())
+			}
+			ServerErroredFlag = true
+		}
+		time.Sleep(time.Second * 5)
+		goto tryNext
 	} else {
 		apiVersion := objGetData.GetAPIVersion()
 		if config.ApiVersion == apiVersion {
@@ -941,7 +939,6 @@ func AddTmplResourceList(items unstructured.Unstructured, crs CourseRes, itr *In
 	}
 	courseId, ok := ParsingMapStr(annotations, "courseId")
 	if !ok || len(courseId) < 1 {
-		logs.Error("AddTmplResourceListv courseId, does not exist-------------")
 		time.Sleep(time.Second * 5)
 		return false
 	}
@@ -950,7 +947,6 @@ func AddTmplResourceList(items unstructured.Unstructured, crs CourseRes, itr *In
 	}
 	resourceName, ok := ParsingMapStr(annotations, "resourceName")
 	if !ok || len(resourceName) < 1 {
-		logs.Error("AddTmplResourceListv resourceName, does not exist-----------")
 		time.Sleep(time.Second * 5)
 		return false
 	}
@@ -964,13 +960,11 @@ func AddTmplResourceList(items unstructured.Unstructured, crs CourseRes, itr *In
 		}
 	}
 	if courseId != crs.CourseId {
-		logs.Error("AddTmplResourceListv -----course id not equal, courseId :%v, crs.CourseId:%v ", courseId, crs.CourseId)
 		// time.Sleep(time.Second * 5)
 		return false
 	}
 	if len(resType) > 0 && len(resourceName) > 0 {
 		if resType != resourceName {
-			logs.Error("AddTmplResourceListv -----resourceName not equal, resType :%v,resourceName:%v ", resType, resourceName)
 			time.Sleep(time.Second * 5)
 			return false
 		}
@@ -1014,20 +1008,6 @@ func AddTmplResourceList(items unstructured.Unstructured, crs CourseRes, itr *In
 			}
 		}
 	}
-	// courseChan, _ := CoursePoolVar.Get(courseId)
-	// if courseChan == nil {
-	// 	courseData := make(chan *InitTmplResource, crs.ResPoolSize)
-	// 	courseData <- itr
-	// 	CoursePoolVar.Set(courseId, courseData)
-	// } else {
-	// 	if len(courseChan) >= crs.ResPoolSize {
-	// 		logs.Error("AddTmplResourceList delete data, itr:", itr)
-	// 		return false
-	// 	}
-	// 	courseChan <- itr
-	// 	CoursePoolVar.Set(courseId, courseChan)
-	// 	logs.Info("AddTmplResourceList courseId: ", courseId, "len(courseChan)=", len(courseChan))
-	// }
 	return true
 }
 
@@ -1071,7 +1051,10 @@ func UpdateRes(rri *ResResourceInfo, objGetData *unstructured.Unstructured, dr d
 			logs.Info("Mirror environment is ready...resName: ", objGetData.GetName())
 			objGetData = UpdateObjData(dr, cr, objGetData, itr, false)
 			_, err = dr.Update(context.TODO(), objGetData, metav1.UpdateOptions{})
-			logs.Error(objGetData.Object["status"], "-------------------------------------update crd err: ", err)
+			if err != nil {
+
+				logs.Error(objGetData.Object["status"], "-------------------------------------update crd err: ", err)
+			}
 
 			break
 		}
@@ -1097,11 +1080,10 @@ func UpdateRes(rri *ResResourceInfo, objGetData *unstructured.Unstructured, dr d
 		logs.Info("Created image has timed out",
 			common.PraseTimeInt(common.GetCurTime())-common.PraseTimeInt(curCreateTime), config.Spec.RecycleAfterSeconds)
 	}
-	logs.Info("Start of updating resources, resource name:", obj.GetName())
 	if isDelete {
 		err = dr.Delete(context.TODO(), objGetData.GetName(), metav1.DeleteOptions{})
 		if err != nil {
-			logs.Error("delete, err: ", err)
+			logs.Error("delete, err: ", err.Error())
 		}
 		return errors.New("deleted")
 	}
@@ -1141,7 +1123,6 @@ func ParaseResData(resData *unstructured.Unstructured, rri *ResResourceInfo, eoi
 		rri.Status = 0
 		rri.UserName = ""
 		rri.EndPoint = ""
-		// deleteResource(eoi.ResourId, resData, dr)
 
 	}
 	rri.RemainTime = remainTime
@@ -1151,10 +1132,6 @@ func ApplyPoolInstance(yamlData []byte, rri *ResResourceInfo, rr ReqResource, ya
 
 	if CoursePoolVar.InitialFlag {
 		courseData, ok := CoursePoolVar.Get(rr.CourseId)
-		// if !ok {
-		// 	courseData = make(chan InitTmplResource, 7)
-		// 	CoursePoolVar.Set(rr.CourseId, courseData)
-		// }
 		if ok {
 			for {
 				downLock.Lock()
@@ -1165,7 +1142,6 @@ func ApplyPoolInstance(yamlData []byte, rri *ResResourceInfo, rr ReqResource, ya
 					break
 				}
 				itr := <-courseData
-				logs.Error("----------------use pool resource: ", itr.Name, "----Subdomain:", itr.Subdomain, "---UserId:", itr.UserId)
 				itr.UserId = strconv.FormatInt(rr.UserId, 10)
 				cr := CourseResources{}
 				yamlData = ParseTmpl(yamlDir, rr, localPath, itr, &cr, false)
@@ -1180,13 +1156,13 @@ func ApplyPoolInstance(yamlData []byte, rri *ResResourceInfo, rr ReqResource, ya
 				obj := &unstructured.Unstructured{}
 				_, gvk, err = yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme).Decode(yamlData, nil, obj)
 				if err != nil {
-					logs.Error("failed to get GVK, err: ", err)
+					logs.Error("failed to get GVK, err: ", err.Error())
 					AddResPool(rr.CourseId, rr.ResourceId, rr.EnvResource)
 					break
 				}
 				dr, err = GetGVRdyClient(gvk, obj.GetNamespace(), rr.ResourceId)
 				if err != nil {
-					logs.Error("failed to get dr: ", err)
+					logs.Error("failed to get dr: ", err.Error())
 					AddResPool(rr.CourseId, rr.ResourceId, rr.EnvResource)
 					break
 				}
@@ -1194,19 +1170,19 @@ func ApplyPoolInstance(yamlData []byte, rri *ResResourceInfo, rr ReqResource, ya
 				config := new(YamlConfig)
 				err = ymV2.Unmarshal(yamlData, config)
 				if err != nil {
-					logs.Error("yaml1.Unmarshal, err: ", err)
+					logs.Error("yaml1.Unmarshal, err: ", err.Error())
 					AddResPool(rr.CourseId, rr.ResourceId, rr.EnvResource)
 					break
 				}
 				objGet, err = dr.Get(context.TODO(), obj.GetName(), metav1.GetOptions{})
 				if err != nil {
-					logs.Error("ApplyPoolInstance, dr.Get, err: ", err)
+					logs.Error("ApplyPoolInstance, dr.Get, err: ", err.Error())
 					AddResPool(rr.CourseId, rr.ResourceId, rr.EnvResource)
 					continue
 				} else {
 					err = UpdateRes(rri, objGet, dr, config, obj, objCreate, &cr, itr)
 					if err != nil {
-						logs.Error("UpdateRes err: ", err)
+						logs.Error("UpdateRes err: ", err.Error())
 						AddResPool(rr.CourseId, rr.ResourceId, rr.EnvResource)
 						continue
 					}
@@ -1236,27 +1212,27 @@ func CreateInstance(rri *ResResourceInfo, rr ReqResource, yamlDir, localPath str
 	obj := &unstructured.Unstructured{}
 	_, gvk, err = yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme).Decode(yamlData, nil, obj)
 	if err != nil {
-		logs.Error("failed to get GVK, err: ", err)
+		logs.Error("failed to get GVK, err: ", err.Error())
 		return err
 	}
 	dr, err = GetGVRdyClient(gvk, obj.GetNamespace(), rr.ResourceId)
 	if err != nil {
-		logs.Error("failed to get dr: ", err)
+		logs.Error("failed to get dr: ", err.Error())
 		return err
 	}
 	// store db
 	config := new(YamlConfig)
 	err = ymV2.Unmarshal(yamlData, config)
 	if err != nil {
-		logs.Error("yaml1.Unmarshal, err: ", err)
+		logs.Error("yaml1.Unmarshal, err: ", err.Error())
 		return err
 	}
 	objGet, err = dr.Get(context.TODO(), obj.GetName(), metav1.GetOptions{})
 	if err != nil {
-		logs.Notice(obj.GetName(), "Get an instance from the prepared instance, err: ", err)
+		logs.Notice(obj.GetName(), "Get an instance from the prepared instance, err: ", err.Error())
 		err = ApplyPoolInstance(yamlData, rri, rr, yamlDir, localPath)
 		if err != nil {
-			logs.Error("ApplyPoolInstance, err: ", err)
+			logs.Error("ApplyPoolInstance, err: ", err.Error())
 			return err
 		}
 	} else {
@@ -1264,14 +1240,14 @@ func CreateInstance(rri *ResResourceInfo, rr ReqResource, yamlDir, localPath str
 			resName := objGet.GetName()
 			err = dr.Delete(context.TODO(), resName, metav1.DeleteOptions{})
 			if err != nil {
-				logs.Error("delete, err: ", err)
+				logs.Error("delete, err: ", err.Error())
 			} else {
 				logs.Info("resName: ", resName, ", Forced to delete. rr.ForceDelete: ", rr.ForceDelete)
 			}
 			rr.ForceDelete = 1
 			err = ApplyPoolInstance(yamlData, rri, rr, yamlDir, localPath)
 			if err != nil {
-				logs.Error("ApplyPoolInstance, err: ", err)
+				logs.Error("ApplyPoolInstance, err: ", err.Error())
 				return err
 			}
 		} else {
@@ -1279,7 +1255,7 @@ func CreateInstance(rri *ResResourceInfo, rr ReqResource, yamlDir, localPath str
 			if err != nil {
 				err = ApplyPoolInstance(yamlData, rri, rr, yamlDir, localPath)
 				if err != nil {
-					logs.Error("ApplyPoolInstance, err: ", err)
+					logs.Error("ApplyPoolInstance, err: ", err.Error())
 					return err
 				}
 			}
@@ -1324,19 +1300,19 @@ func GetCreateRes(yamlData []byte, rri *ResResourceInfo, resourceId string,
 	obj := &unstructured.Unstructured{}
 	_, gvk, err = yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme).Decode(yamlData, nil, obj)
 	if err != nil {
-		logs.Error("failed to get GVK, err: ", err)
+		logs.Error("failed to get GVK, err: ", err.Error())
 		return err
 	}
 	dr, err = GetGVRdyClient(gvk, obj.GetNamespace(), resourceId)
 	if err != nil {
-		logs.Error("failed to get dr: ", err)
+		logs.Error("failed to get dr: ", err.Error())
 		return err
 	}
 	// store db
 	config := new(YamlConfig)
 	err = ymV2.Unmarshal(yamlData, config)
 	if err != nil {
-		logs.Error("yaml1.Unmarshal, err: ", err)
+		logs.Error("yaml1.Unmarshal, err: ", err.Error())
 		return err
 	}
 	curCreateTime := ""
@@ -1496,7 +1472,6 @@ func SaveResourceTemplate(rr *ReqResource) error {
 		upErr := models.UpdateResourceTempathRel(&rtr,
 			"ResourceId", "ResourcePath",
 			"ResPoolSize", "CreateTime", "UpdateTime")
-		logs.Error(upErr, "=================UpdateResourceTempathRel:", rtr)
 		if upErr != nil && !strings.Contains(upErr.Error(), "no row found") {
 			logs.Error("upErr: ", upErr)
 			return upErr
@@ -1533,19 +1508,19 @@ func ClearInvaildResource() error {
 		obj := &unstructured.Unstructured{}
 		_, gvk, err = yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme).Decode(content, nil, obj)
 		if err != nil {
-			logs.Error("failed to get GVK, err: ", err)
+			logs.Error("failed to get GVK, err: ", err.Error())
 			return err
 		}
 		dr, err = GetGVRdyClient(gvk, obj.GetNamespace(), rt.ResourceId)
 		if err != nil {
-			logs.Error("failed to get dr: ", err)
+			logs.Error("failed to get dr: ", err.Error())
 			return err
 		}
 		// store db
 		config := new(YamlConfig)
 		err = ymV2.Unmarshal(content, config)
 		if err != nil {
-			logs.Error("yaml1.Unmarshal, err: ", err)
+			logs.Error("yaml1.Unmarshal, err: ", err.Error())
 			return err
 		}
 		DelInvaildResource(objList, dr, config, obj)

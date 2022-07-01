@@ -2,7 +2,6 @@ package common
 
 import (
 	"encoding/base64"
-	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -12,10 +11,7 @@ import (
 
 	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/logs"
-	"k8s.io/client-go/rest"
 )
-
-var GlobK8sConfig *rest.Config
 
 func Catchs() {
 	if err := recover(); err != nil {
@@ -137,7 +133,6 @@ func GetTZHTime(hours time.Duration) string {
 	now := time.Now()
 	h, _ := time.ParseDuration("-1h")
 	dateTime := now.Add(hours * h).Format(DATE_T_Z_FORMAT)
-	fmt.Println("dateTime: ", dateTime)
 	return dateTime
 }
 

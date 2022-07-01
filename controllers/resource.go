@@ -1,8 +1,10 @@
 package controllers
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"net/url"
+	"playground_backend/common"
 	"playground_backend/handler"
 	"playground_backend/models"
 	"strconv"
@@ -16,28 +18,10 @@ type CrdResourceControllers struct {
 	beego.Controller
 }
 
-type RequestParameter struct {
-	ResourceId   string `json:"resourceId"`
-	CourseId     string `json:"courseId"`
-	ChapterId    string `json:"chapterId"`
-	Backend      string `json:"backend"`
-	TemplatePath string `json:"templatePath"`
-	UserId       int64  `json:"userId"`
-	ContactEmail string `json:"contactEmail"`
-	Token        string `json:"token"`
-	ForceDelete  int    `json:"forceDelete"`
-}
-
-func (c *CrdResourceControllers) RetData(resp ResData) {
+func (c *CrdResourceControllers) RetData(resp handler.ResData) {
 	logs.Info("Create Resource Response: ", resp)
 	c.Data["json"] = resp
 	c.ServeJSON()
-}
-
-type ResData struct {
-	ResInfo interface{} `json:"instanceInfo"`
-	Mesg    string      `json:"message"`
-	Code    int         `json:"code"`
 }
 
 // @Title CreateCrdResource
@@ -47,11 +31,11 @@ type ResData struct {
 // @Failure 403 body is empty
 // @router / [post]
 func (u *CrdResourceControllers) Post() {
-	var rp RequestParameter
-	var resData ResData
+	var rp handler.RequestParameter
+	var resData handler.ResData
 	req := u.Ctx.Request
 	addr := req.RemoteAddr
-	logs.Info("Method: ", req.Method, "Client request ip address: ", addr, ",Header: ", req.Header)
+	logs.Error("Method: ", req.Method, "Client request ip address: ", addr, ",Header: ", req.Header)
 	logs.Info("created crd parameters: ", string(u.Ctx.Input.RequestBody))
 	jsErr := json.Unmarshal(u.Ctx.Input.RequestBody, &rp)
 	if jsErr != nil {
@@ -61,55 +45,22 @@ func (u *CrdResourceControllers) Post() {
 		u.RetData(resData)
 		return
 	}
-	if (len(rp.TemplatePath) < 1 && len(rp.Backend) < 1) ||
-		rp.UserId < 1 || len(rp.CourseId) < 1 {
+	if (len(rp.TemplatePath) < 1 && len(rp.Backend) < 1) || len(rp.CourseId) < 1 {
 		resData.Code = 400
 		resData.Mesg = "Please check whether the request parameters are correct"
 		logs.Error("created crd parameters: ", rp)
 		u.RetData(resData)
-		// crd := models.Courses{CourseId: rp.CourseId}
-		// ccp := models.CoursesChapter{CourseId: rp.CourseId, ChapterId: rp.ChapterId}
-		// handler.WriteCourseData(rp.UserId, rp.CourseId, rp.ChapterId, "Application Resources",
-		// 	"", "failed", "Please check whether the request parameters are correct",
-		// 	1, 1, &crd, &ccp)
 		return
-	}
-	if len(rp.Token) < 1 {
-		resData.Code = 401
-		resData.Mesg = "Unauthorized authentication information"
-		u.RetData(resData)
-		// crd := models.Courses{CourseId: rp.CourseId}
-		// ccp := models.CoursesChapter{CourseId: rp.CourseId, ChapterId: rp.ChapterId}
-		// handler.WriteCourseData(rp.UserId, rp.CourseId, rp.ChapterId,
-		// 	"Application Resources", "", "failed",
-		// 	"Unauthorized authentication information",
-		// 	1, 1, &crd, &ccp)
-		return
-	} else {
-		gui := models.AuthUserInfo{AccessToken: rp.Token, UserId: rp.UserId}
-		ok := handler.CheckToken(&gui)
-		if !ok {
-			resData.Mesg = "Authority authentication failed:" + rp.Token + "----userid:" + strconv.Itoa(int(rp.UserId))
-			resData.Code = 403
-			u.RetData(resData)
-
-			// crd := models.Courses{CourseId: rp.CourseId}
-			// ccp := models.CoursesChapter{CourseId: rp.CourseId, ChapterId: rp.ChapterId}
-			// handler.WriteCourseData(rp.UserId, rp.CourseId, rp.ChapterId, "Application Resources",
-			// 	"", "filed", "Authority authentication failed",
-			// 	1, 1, &crd, &ccp)
-
-			return
-		}
 	}
 
 	if rp.ForceDelete == 0 {
 		rp.ForceDelete = 1
 	}
+	userid, _ := strconv.Atoi(u.Data["me"].(string))
 	// Query resource node information
 	rcp := models.ResourceConfigPath{ResourcePath: rp.TemplatePath, EulerBranch: rp.Backend}
 	var rri = new(handler.ResResourceInfo)
-	rr := handler.ReqResource{EnvResource: rp.TemplatePath, UserId: rp.UserId,
+	rr := handler.ReqResource{EnvResource: rp.TemplatePath, UserId: int64(userid),
 		ContactEmail: rp.ContactEmail, ForceDelete: rp.ForceDelete,
 		ResourceId: rcp.ResourceId, CourseId: rp.CourseId, ChapterId: rp.ChapterId}
 	rri.CourseId = rp.CourseId
@@ -121,11 +72,6 @@ func (u *CrdResourceControllers) Post() {
 		resData.Mesg = "Retry later while course info is syncing"
 		resData.Code = 404
 		u.RetData(resData)
-		// crd := models.Courses{CourseId: rp.CourseId}
-		// ccp := models.CoursesChapter{CourseId: rp.CourseId, ChapterId: rp.ChapterId}
-		// handler.WriteCourseData(rp.UserId, rp.CourseId, rp.ChapterId, "Application Resources",
-		// 	"", "filed", "Retry later while course info is syncing",
-		// 	1, 1, &crd, &ccp)
 		return
 	}
 	rcpErr := rr.SaveCourseAndResRel(&rcp, cs.Name)
@@ -134,12 +80,6 @@ func (u *CrdResourceControllers) Post() {
 		resData.Mesg = "The corresponding instance resource is not currently configured"
 		logs.Error("created crd parameters: ", rp)
 		u.RetData(resData)
-		// crd := models.Courses{CourseId: rp.CourseId}
-		// ccp := models.CoursesChapter{CourseId: rp.CourseId, ChapterId: rp.ChapterId}
-		// handler.WriteCourseData(rp.UserId, rp.CourseId, rp.ChapterId,
-		// 	"Application Resources", "", "failed",
-		// 	"The corresponding instance resource is not currently configured",
-		// 	1, 1, &crd, &ccp)
 		return
 	}
 	rp.TemplatePath = rcp.ResourcePath
@@ -156,7 +96,7 @@ func (u *CrdResourceControllers) Post() {
 		}
 		crd := models.Courses{CourseId: rp.CourseId}
 		ccp := models.CoursesChapter{CourseId: rp.CourseId, ChapterId: rp.ChapterId}
-		handler.WriteCourseData(rp.UserId, rp.CourseId, rp.ChapterId, "Application Resources", rri.ResName,
+		handler.WriteCourseData(int64(userid), rp.CourseId, rp.ChapterId, "Application Resources", rri.ResName,
 			"success", "User learning courses apply for instance resources successfully",
 			1, 1, &crd, &ccp)
 		userResId := handler.CreateUserResourceEnv(rr)
@@ -169,7 +109,7 @@ func (u *CrdResourceControllers) Post() {
 		resData.Mesg = "Failed to create resource, need to request resource again"
 		crd := models.Courses{CourseId: rp.CourseId}
 		ccp := models.CoursesChapter{CourseId: rp.CourseId, ChapterId: rp.ChapterId}
-		handler.WriteCourseData(rp.UserId, rp.CourseId, rp.ChapterId, "Application Resources", rri.ResName,
+		handler.WriteCourseData(int64(userid), rp.CourseId, rp.ChapterId, "Application Resources", rri.ResName,
 			"failed", "Failed to create resource, need to request resource again",
 			1, 1, &crd, &ccp)
 	}
@@ -186,18 +126,18 @@ func (u *CrdResourceControllers) Post() {
 func (u *CrdResourceControllers) Get() {
 	req := u.Ctx.Request
 	addr := req.RemoteAddr
-	var resData ResData
+	var resData handler.ResData
 	logs.Info("Method: ", req.Method, "Client request ip address: ", addr,
 		", Header: ", req.Header, ", body: ", req.Body)
-	token := u.GetString("token")
-	userResId, _ := u.GetInt64("userResId", 0)
+
+	userResId, _ := strconv.Atoi(u.Data["me"].(string))
 	if userResId == 0 {
 		resData.Mesg = "Please check whether to upload user resource id information"
 		resData.Code = 404
 		u.RetData(resData)
 		return
 	}
-	ure := models.UserResourceEnv{Id: userResId}
+	ure := models.UserResourceEnv{Id: int64(userResId)}
 	handler.QueryUserResourceEnv(&ure)
 	if ure.Id == 0 {
 		resData.Mesg = "User resource id information is wrong"
@@ -205,31 +145,25 @@ func (u *CrdResourceControllers) Get() {
 		u.RetData(resData)
 		return
 	}
-	if token == "" {
-		resData.Mesg = "Unauthorized authentication information"
-		resData.Code = 403
-		u.RetData(resData)
-		return
-	} else {
-		var rri = new(handler.ResResourceInfo)
-		rr := handler.ReqResource{EnvResource: ure.TemplatePath, UserId: ure.UserId,
-			ResourceId: ure.ResourceId, CourseId: ure.CourseId,
-			ChapterId: ure.ChapterId, ContactEmail: ure.ContactEmail}
-		rri.CourseId = ure.CourseId
-		rri.ChapterId = ure.ChapterId
-		handler.GetEnvResource(rr, rri)
-		rri.UserResId = userResId
-		resData.ResInfo = *rri
-		resData.Code = 200
-		resData.Mesg = "success"
-		u.RetData(resData)
-		crd := models.Courses{CourseId: ure.CourseId}
-		ccp := models.CoursesChapter{CourseId: ure.CourseId, ChapterId: ure.ChapterId}
-		handler.WriteCourseData(ure.UserId, ure.CourseId, ure.ChapterId, "Query application resources", rri.ResName,
-			"success", "Query application resource success",
-			1, 1, &crd, &ccp)
-	}
-	return
+
+	var rri = new(handler.ResResourceInfo)
+	rr := handler.ReqResource{EnvResource: ure.TemplatePath, UserId: ure.UserId,
+		ResourceId: ure.ResourceId, CourseId: ure.CourseId,
+		ChapterId: ure.ChapterId, ContactEmail: ure.ContactEmail}
+	rri.CourseId = ure.CourseId
+	rri.ChapterId = ure.ChapterId
+	handler.GetEnvResource(rr, rri)
+	rri.UserResId = int64(userResId)
+	resData.ResInfo = *rri
+	resData.Code = 200
+	resData.Mesg = "success"
+	u.RetData(resData)
+	crd := models.Courses{CourseId: ure.CourseId}
+	ccp := models.CoursesChapter{CourseId: ure.CourseId, ChapterId: ure.ChapterId}
+	handler.WriteCourseData(ure.UserId, ure.CourseId, ure.ChapterId, "Query application resources", rri.ResName,
+		"success", "Query application resource success",
+		1, 1, &crd, &ccp)
+
 }
 
 type CheckSubdomain struct {
@@ -313,7 +247,8 @@ func (u *CrdResourceControllers) CheckSubdomain() {
 		u.ServeJSON()
 		return
 	}
-	if int(authUseraInfo.UserId) != int(resourceInfo.UserId) {
+	subid, _ := strconv.Atoi(authUseraInfo.SubUid)
+	if subid != int(resourceInfo.UserId) {
 		u.Data["json"] = map[string]interface{}{
 			"detail": authUseraInfo.UserId,
 			"body":   " 不等",
@@ -323,11 +258,26 @@ func (u *CrdResourceControllers) CheckSubdomain() {
 		u.ServeJSON()
 		return
 	}
-
+	resourceInfo.PassWord = ""
 	u.Data["json"] = map[string]interface{}{
 		"code": 200,
 		"data": resourceInfo,
 	}
 	u.ServeJSON()
+}
 
+// @Title Get MakeKubeconfig
+// @Description 加密和编码kubeconfig内容
+// @Param	kubeconfig		FormData 	file	true		"kubeconfig"
+// @Success 200 {object} CheckPgweb
+// @Failure 403 :status is err
+// @router /playground/crd/makeKubeconfig [post]
+func (u *CrdResourceControllers) MakeKubeconfig() {
+	aesStr := common.AesString(u.Ctx.Input.RequestBody)
+	encodeRes := base64.StdEncoding.EncodeToString([]byte(aesStr))
+	u.Data["json"] = map[string]interface{}{
+		"code": 200,
+		"data": encodeRes,
+	}
+	u.ServeJSON()
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"playground_backend/handler"
 	"playground_backend/models"
+	"strconv"
 
 	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/logs"
@@ -40,13 +41,17 @@ func (u *CourseChapterControllers) Post() {
 	logs.Info("Bind Course parameters: ", string(u.Ctx.Input.RequestBody))
 	err := json.Unmarshal(u.Ctx.Input.RequestBody, &crp)
 	if err != nil {
-		logs.Error("json.Unmarshal, err: ", err)
+		logs.Error("json.Unmarshal, err: ", err.Error())
 		resData.Code = 404
 		resData.Mesg = "Parameter error"
 		logs.Error("Bind Course parameters: ", crp)
 		u.RetData(resData)
 		return
 	}
+	userIdInt, _ := strconv.Atoi(u.Data["me"].(string))
+	crp.UserId = int64(userIdInt)
+	crp.Token = u.Ctx.Input.Header("token")
+
 	resData.ResInfo.CId = 0
 	resData.ResInfo.State = "error"
 	if len(crp.CourseId) < 1 || crp.UserId < 1 {
@@ -136,7 +141,9 @@ func (u *CourseChapterControllers) Get() {
 	logs.Info("Method: ", req.Method, "Client request ip address: ", addr,
 		", Header: ", req.Header, ", body: ", req.Body)
 	token := u.GetString("token")
-	userId, _ := u.GetInt64("userId", 0)
+	// userId, _ := u.GetInt64("userId", 0)
+	userIdInt, _ := strconv.Atoi(u.Data["me"].(string))
+	userId := int64(userIdInt)
 	currentPage, _ := u.GetInt("currentPage", 1)
 	pageSize, _ := u.GetInt("pageSize", 100)
 	if userId == 0 {
@@ -151,7 +158,7 @@ func (u *CourseChapterControllers) Get() {
 		u.RetDetailData(resData)
 		crd := models.Courses{}
 		ccp := models.CoursesChapter{}
-		handler.WriteCourseData(userId, "", "", "Query user's courses",
+		handler.WriteCourseData(int64(userId), "", "", "Query user's courses",
 			"", "failed", "Unauthorized authentication information",
 			1, 1, &crd, &ccp)
 		return

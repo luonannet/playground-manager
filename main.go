@@ -23,14 +23,11 @@ func main() {
 		println("error: Database initialization failed")
 		return
 	}
-	// if beego.BConfig.RunMode == beego.DEV {
-	// 	orm.Debug = true
-	// } else {
-	// 	orm.Debug = false
-	// }
+
 	// 1. Initialize memory resources
 	handler.NewCoursePool(0)
 	handler.InitialResourcePool()
+	handler.InitAuthing()
 	// Initialize a scheduled task
 	taskOk := task.InitTask()
 	if !taskOk {
