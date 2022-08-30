@@ -1239,8 +1239,7 @@ func Authorize(ctx *beegoCtx.Context) {
 		ctx.Input.SetData("idtoken", string(idtokenBytes))
 	} else {
 		// ctx.Abort(http.StatusForbidden, "非法用户")
-		// 对于非法用户，直接跳转到首页去。
-		ctx.Redirect(http.StatusFound, "/")
+		ctx.WriteString("非法用户")
 		return
 	}
 }
