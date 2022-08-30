@@ -112,10 +112,6 @@ type AuthingLoginUser struct {
 	Website    string `json:"website,omitempty"`
 	ExternalID string `json:"external_id,omitempty"`
 	Sub        string `json:"sub,omitempty"`
-	// Email               string `json:"email,omitempty"`
-	// EmailVerified       bool   `json:"email_verified,omitempty"`
-	// PhoneNumber         string `json:"phone_number,omitempty"`
-	// PhoneNumberVerified bool   `json:"phone_number_verified,omitempty"`
 }
 
 type IdpUserInfo struct {
@@ -1242,7 +1238,9 @@ func Authorize(ctx *beegoCtx.Context) {
 		ctx.Input.SetData("me", userId)
 		ctx.Input.SetData("idtoken", string(idtokenBytes))
 	} else {
-		ctx.Abort(http.StatusForbidden, "非法用户")
+		// ctx.Abort(http.StatusForbidden, "非法用户")
+		// 对于非法用户，直接跳转到首页去。
+		ctx.Redirect(http.StatusFound, "/")
 		return
 	}
 }
